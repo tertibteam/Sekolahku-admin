@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SekolahKu Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #1a1d24;
+    --border: rgba(255,255,255,.07);
+    --ink: #e8eaf0;
+    --ink2: #8b90a0;
+    --ink3: #4a4f60;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,.12);
+    --purple: #a855f7;
+    --purple-dim: rgba(168,85,247,.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar-logo {
+    width: 28px; height: 28px;
+    background: var(--blue);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 700; color: #fff;
+  }
+  .topbar-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    letter-spacing: .4px;
+  }
+  .topbar-sub { font-size: 11px; color: var(--ink3); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  #lastRefresh { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--ink3); }
+  .btn-refresh {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink2);
+    font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    transition: all .15s;
+  }
+  .btn-refresh:hover { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+  .btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── LOGIN SCREEN ── */
+  #loginWrap {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 70vh;
+  }
+  .login-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    width: 320px;
+  }
+  .login-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .login-box p { font-size: 12px; color: var(--ink2); margin-bottom: 20px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--ink2); margin-bottom: 5px; font-weight: 500; letter-spacing: .3px; }
+  .field input {
+    width: 100%; padding: 9px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--ink);
+    font-size: 13px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--blue); }
+  .btn-login {
+    width: 100%; padding: 10px;
+    background: var(--blue);
+    border: none; border-radius: 7px;
+    color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif;
+    margin-top: 4px;
+    transition: opacity .15s;
+  }
+  .btn-login:hover { opacity: .88; }
+  .login-err { font-size: 12px; color: var(--red); margin-top: 8px; display: none; }
+
+  /* ── STAT CARDS ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  @media(max-width:700px){ .kpi-row { grid-template-columns: repeat(2,1fr); } }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative; overflow: hidden;
+  }
+  .kpi::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent, var(--blue));
+    border-radius: 10px 10px 0 0;
+  }
+  .kpi-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px; font-weight: 700;
+    line-height: 1; margin-bottom: 4px;
+    color: var(--accent, var(--blue));
+  }
+  .kpi-lbl { font-size: 11px; color: var(--ink2); font-weight: 500; letter-spacing: .2px; }
+
+  /* ── SECTION HEADER ── */
+  .sec-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .sec-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink3); letter-spacing: .6px; text-transform: uppercase;
+  }
+  .sec-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; color: var(--ink3);
+  }
+
+  /* ── SEARCH ── */
+  .search-bar {
+    width: 100%;
+    padding: 9px 12px 9px 34px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--ink); font-size: 13px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    outline: none;
+    margin-bottom: 12px;
+    transition: border-color .15s;
+  }
+  .search-bar:focus { border-color: var(--blue); }
+  .search-wrap { position: relative; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: .35; }
+
+  /* ── SCHOOL TABLE ── */
+  .school-list { display: flex; flex-direction: column; gap: 8px; }
+  .school-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+    transition: border-color .2s;
+  }
+  .school-card:hover { border-color: rgba(255,255,255,.15); }
+  .school-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+  }
+  .school-av {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .school-name { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+  .school-meta { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+  .school-stats {
+    margin-left: auto; display: flex; gap: 16px; align-items: center; flex-shrink: 0;
+  }
+  .stat-pill {
+    display: flex; flex-direction: column; align-items: flex-end;
+  }
+  .stat-pill-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px; font-weight: 700;
+  }
+  .stat-pill-lbl { font-size: 9px; color: var(--ink3); letter-spacing: .3px; text-transform: uppercase; }
+  .chevron { color: var(--ink3); transition: transform .2s; flex-shrink: 0; margin-left: 8px; }
+  .school-card.open .chevron { transform: rotate(90deg); }
+
+  /* ── EXPAND DETAIL ── */
+  .school-detail { display: none; border-top: 1px solid var(--border); }
+  .school-card.open .school-detail { display: block; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  @media(max-width:600px){ .detail-grid { grid-template-columns: 1fr; } }
+
+  .detail-section { padding: 12px 14px; border-right: 1px solid var(--border); }
+  .detail-section:last-child { border-right: none; }
+  .detail-section-title {
+    font-size: 10px; font-weight: 700; color: var(--ink3);
+    text-transform: uppercase; letter-spacing: .5px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 5px;
+  }
+
+  /* Class pills */
+  .class-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .class-pill {
+    padding: 3px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink2);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* User rows */
+  .user-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .user-row:last-child { border-bottom: none; }
+  .user-av-sm {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .user-name { font-size: 12px; font-weight: 500; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-time { font-size: 10px; color: var(--ink3); font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
+  .role-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0;
+  }
+  .rb-teacher { background: var(--blue-dim); color: var(--blue); }
+  .rb-parent  { background: var(--purple-dim); color: var(--purple); }
+
+  /* Children rows */
+  .child-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .child-row:last-child { border-bottom: none; }
+  .child-cls { font-size: 10px; font-family: 'IBM Plex Mono', monospace; color: var(--ink3); flex-shrink: 0; min-width: 36px; }
+  .child-name { font-size: 12px; font-weight: 500; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .child-parent { font-size: 10px; color: var(--ink3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; }
+
+  .empty-note { font-size: 11px; color: var(--ink3); font-style: italic; padding: 6px 0; }
+
+  /* ── SPINNER ── */
+  #loadingOverlay {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 60vh; flex-direction: column; gap: 12px;
+  }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--surface2);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-txt { font-size: 12px; color: var(--ink3); font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--ink); font-size: 12px; padding: 8px 16px;
+    border-radius: 8px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 999;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .badge-new {
+    font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+    background: var(--green-dim); color: var(--green);
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo">SK</div>
+      <div>
+        <div class="topbar-title">SEKOLAHKU MONITOR</div>
+        <div class="topbar-sub">Admin Dashboard</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="lastRefresh"></span>
+      <button class="btn-refresh" id="refreshBtn" onclick="loadData()" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div id="loginWrap">
+    <div class="login-box">
+      <h2>Monitor Login</h2>
+      <p>Admin access only</p>
+      <button class="btn-login" onclick="doLogin()" id="loginBtn" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+  </div>
+
+  <div id="dashboard" style="display:none">
+    <div id="loadingOverlay">
+      <div class="spinner"></div>
+      <div class="loading-txt">Loading data...</div>
+    </div>
+    <div id="mainContent" style="display:none">
+      <!-- KPI row -->
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <!-- Search + School list -->
+      <div class="sec-head">
+        <div class="sec-title">Schools</div>
+        <div class="sec-count" id="schoolCount"></div>
+      </div>
+      <div class="search-wrap">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-bar" type="text" id="searchInput" placeholder="Search school name or ID..." oninput="renderSchools()">
+      </div>
+      <div class="school-list" id="schoolList"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SB = supabase.createClient(
+  'https://rmviuzvpbsraugcumjoy.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtdml1enZwYnNyYXVnY3Vtam95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MTUxMjMsImV4cCI6MjA4OTk5MTEyM30.iHwxDefbINc4USVjlZ0aD2qy6WS7Xip1Do1ggC_Qid4'
+);
+
+// ── State ──
+var D = { schools:[], profiles:[], children:[], classes:[] };
+var NEW_DAYS = 7; // highlight users registered within X days
+
+function toast(msg){
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},2200);
+}
+
+function fmtDate(d){
+  if(!d) return '—';
+  var dt=new Date(d);
+  return dt.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+function fmtRelative(d){
+  if(!d) return '—';
+  var diff=Date.now()-new Date(d).getTime();
+  var mins=Math.floor(diff/60000);
+  if(mins<2) return 'just now';
+  if(mins<60) return mins+'m ago';
+  var hrs=Math.floor(mins/60);
+  if(hrs<24) return hrs+'h ago';
+  var days=Math.floor(hrs/24);
+  if(days<7) return days+'d ago';
+  return fmtDate(d);
+}
+
+function isNew(d){
+  if(!d) return false;
+  return (Date.now()-new Date(d).getTime()) < NEW_DAYS*86400000;
+}
+
+function schoolColor(id){
+  var colors=['#3b82f6','#22c55e','#a855f7','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
+  var h=0; for(var i=0;i<(id||'').length;i++) h=(h*31+id.charCodeAt(i))%colors.length;
+  return colors[Math.abs(h)];
+}
+
+function userColor(name){
+  var colors=['#3b82f6','#22c55e','#a855f7','#f59e0b','#ec4899','#06b6d4','#84cc16'];
+  var h=0; for(var i=0;i<(name||'').length;i++) h=(h*31+name.charCodeAt(i))%colors.length;
+  return colors[Math.abs(h)];
+}
+
+function initials(name){
+  return (name||'?').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+}
+
+// ── Login ──
+async function doLogin(){
+  var err=document.getElementById('loginErr');
+  var btn=document.getElementById('loginBtn');
+  err.style.display='none';
+  btn.disabled=true; btn.textContent='Redirecting...';
+  var {error}=await SB.auth.signInWithOAuth({
+    provider:'google',
+    options:{ redirectTo: window.location.href }
+  });
+  if(error){ err.textContent=error.message; err.style.display='block'; btn.disabled=false; btn.innerHTML='Continue with Google'; }
+}
+
+// ── Load all data ──
+async function loadData(){
+  var btn=document.getElementById('refreshBtn');
+  if(btn) btn.disabled=true;
+  document.getElementById('loadingOverlay').style.display='flex';
+  document.getElementById('mainContent').style.display='none';
+
+  try{
+    var [sRes, pRes, cRes, clRes] = await Promise.all([
+      SB.from('schools').select('school_id,school_name,state,created_at').order('school_name'),
+      SB.from('profiles').select('id,name,email,role,school_id,created_at,phone').order('created_at',{ascending:false}),
+      SB.from('children').select('id,name,display_name,class,school_id,parent_id').order('class'),
+      SB.from('classes').select('class_name,school_id').order('class_name'),
+    ]);
+
+    D.schools  = sRes.data  || [];
+    D.profiles = pRes.data  || [];
+    D.children = cRes.data  || [];
+    D.classes  = clRes.data || [];
+
+    renderKPIs();
+    renderSchools();
+
+    document.getElementById('loadingOverlay').style.display='none';
+    document.getElementById('mainContent').style.display='block';
+
+    var now=new Date();
+    document.getElementById('lastRefresh').textContent='Updated '+now.toLocaleTimeString('en-MY',{hour:'2-digit',minute:'2-digit'});
+  } catch(e){
+    toast('Error loading data: '+e.message);
+    console.error(e);
+  }
+
+  if(btn) btn.disabled=false;
+}
+
+// ── KPIs ──
+function renderKPIs(){
+  var totalSchools=D.schools.length;
+  var totalTeachers=D.profiles.filter(function(p){return p.role==='teacher';}).length;
+  var totalParents=D.profiles.filter(function(p){return p.role==='parent';}).length;
+  var totalChildren=D.children.length;
+
+  var newCutoff=Date.now()-NEW_DAYS*86400000;
+  var newUsers=D.profiles.filter(function(p){return p.created_at&&new Date(p.created_at).getTime()>newCutoff;}).length;
+
+  document.getElementById('kpiRow').innerHTML=
+    kpi(totalSchools,'Schools','var(--blue)')
+    +kpi(totalTeachers,'Teachers','var(--green)')
+    +kpi(totalParents,'Parents','var(--purple)')
+    +kpi(totalChildren,'Students','var(--amber)')
+    ;
+  document.getElementById('schoolCount').textContent=totalSchools+' schools';
+}
+
+function kpi(val,lbl,accent){
+  return '<div class="kpi" style="--accent:'+accent+'"><div class="kpi-val">'+val+'</div><div class="kpi-lbl">'+lbl+'</div></div>';
+}
+
+// ── School list ──
+function renderSchools(){
+  var q=(document.getElementById('searchInput').value||'').toLowerCase();
+  var list=D.schools.filter(function(s){
+    return !q||s.school_name.toLowerCase().includes(q)||s.school_id.toLowerCase().includes(q);
+  });
+  document.getElementById('schoolCount').textContent=list.length+' / '+D.schools.length+' schools';
+
+  if(!list.length){
+    document.getElementById('schoolList').innerHTML='<div class="empty-note" style="padding:16px">No schools found.</div>';
+    return;
+  }
+
+  document.getElementById('schoolList').innerHTML=list.map(function(s){
+    var teachers=D.profiles.filter(function(p){return p.school_id===s.school_id&&p.role==='teacher';});
+    var parents=D.profiles.filter(function(p){return p.school_id===s.school_id&&p.role==='parent';});
+    var children=D.children.filter(function(c){return c.school_id===s.school_id;});
+    var classes=D.classes.filter(function(c){return c.school_id===s.school_id;});
+    var color=schoolColor(s.school_id);
+    var newFlag=isNew(s.created_at)?'<span class="badge-new">NEW</span>':'';
+
+    return '<div class="school-card" id="sc-'+s.school_id+'">'
+      +'<div class="school-header" onclick="toggleSchool(\''+s.school_id+'\')">'
+        +'<div class="school-av" style="background:'+color+'">'+initials(s.school_name)+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div class="school-name" style="display:flex;align-items:center;gap:6px">'+escHtml(s.school_name)+' '+newFlag+'</div>'
+          +'<div class="school-meta">'+s.school_id+(s.state?' &bull; '+s.state:'')+(s.created_at?' &bull; Joined '+fmtDate(s.created_at):'')+'</div>'
+        +'</div>'
+        +'<div class="school-stats">'
+          +'<div class="stat-pill"><div class="stat-pill-val" style="color:var(--green)">'+teachers.length+'</div><div class="stat-pill-lbl">Teachers</div></div>'
+          +'<div class="stat-pill"><div class="stat-pill-val" style="color:var(--purple)">'+parents.length+'</div><div class="stat-pill-lbl">Parents</div></div>'
+          +'<div class="stat-pill"><div class="stat-pill-val" style="color:var(--amber)">'+children.length+'</div><div class="stat-pill-lbl">Students</div></div>'
+        +'</div>'
+        +'<svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
+      +'</div>'
+      +'<div class="school-detail">'+renderSchoolDetail(s,teachers,parents,children,classes)+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function toggleSchool(id){
+  var el=document.getElementById('sc-'+id);
+  el.classList.toggle('open');
+}
+
+function renderSchoolDetail(s,teachers,parents,children,classes){
+  // Build parent lookup
+  var parentMap={};
+  parents.forEach(function(p){ parentMap[p.id]=p; });
+
+  // Classes section
+  var classesSec='<div class="detail-section-title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Classes ('+classes.length+')</div>'
+    +(classes.length
+      ? '<div class="class-pills">'+classes.map(function(c){return '<div class="class-pill">'+escHtml(c.class_name)+'</div>';}).join('')+'</div>'
+      : '<div class="empty-note">No classes yet</div>');
+
+  // Teachers section
+  var teacherSec='<div class="detail-section-title" style="margin-top:12px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Teachers ('+teachers.length+')</div>'
+    +(teachers.length
+      ? teachers.slice(0,8).map(function(t){
+          return '<div class="user-row">'
+            +'<div class="user-av-sm" style="background:'+userColor(t.name)+'">'+initials(t.name)+'</div>'
+            +'<div class="user-name">'+escHtml(t.name||t.email||'—')+'</div>'
+            +(isNew(t.created_at)?'<span class="badge-new">NEW</span>':'')
+            +'<div class="user-time">'+fmtDate(t.created_at)+'</div>'
+            +'</div>';
+        }).join('')+(teachers.length>8?'<div class="empty-note">+' +(teachers.length-8)+' more</div>':'')
+      : '<div class="empty-note">No teachers</div>');
+
+  // Parents + children section
+  var parentSec='<div class="detail-section-title"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Parents &amp; Children ('+parents.length+' / '+children.length+')</div>'
+    +(children.length
+      ? children.slice(0,10).map(function(c){
+          var par=parentMap[c.parent_id];
+          return '<div class="child-row">'
+            +'<div class="child-cls">'+escHtml(c.class||'—')+'</div>'
+            +'<div class="child-name">'+escHtml(c.display_name||c.name||'—')+'</div>'
+            +'<div class="child-parent">'+(par?escHtml(par.name||par.email||'—'):'—')+'</div>'
+            +'</div>';
+        }).join('')+(children.length>10?'<div class="empty-note">+' +(children.length-10)+' more students</div>':'')
+      : '<div class="empty-note">No students registered</div>');
+
+  return '<div class="detail-grid">'
+    +'<div class="detail-section">'+classesSec+teacherSec+'</div>'
+    +'<div class="detail-section">'+parentSec+'</div>'
+    +'</div>';
+}
+
+function escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auth check on load ──
+SB.auth.getSession().then(function(r){
+  if(r.data&&r.data.session){
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    document.getElementById('refreshBtn').style.display='flex';
+    loadData();
+  }
+});
+</script>
+</body>
+</html>
